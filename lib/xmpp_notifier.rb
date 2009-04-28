@@ -1,6 +1,7 @@
 require 'pathname'
+require 'xmpp4r/client'
 
-# Copyright (c) 2005 Jamis Buck
+# Copyright (c) 2009 Marian Rudzynski
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -20,49 +21,59 @@ require 'pathname'
 # LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-class ExceptionNotifier < ActionMailer::Base
-	@@sender_address = %("Exception Notifier" <exception.notifier@default.com>)
-	cattr_accessor :sender_address
+class XmppNotifier
+	@@sender_account = []
+	cattr_accessor :sender_account
 
 	@@exception_recipients = []
 	cattr_accessor :exception_recipients
 
-	@@email_prefix = "[ERROR] "
-	cattr_accessor :email_prefix
+	@@message_prefix = "[ERROR] "
+	cattr_accessor :message_prefix
 
 	@@sections = %w(request session environment backtrace)
 	cattr_accessor :sections
 
-	self.template_root = "#{File.dirname(__FILE__)}/../views"
+	@@client = nil
+	cattr_accessor :client
 
-	def self.reloadable?() 
-		false 
+	class << self
+		def reloadable?() 
+			false
+		end
+
+		def connect
+			if !client
+				jid = Jabber::JID::new(sender_account[0])
+
+				@@client = Jabber::Client.new(jid)
+				@@client.connect
+				@@client.auth(sender_account[1])
+			end
+		end
+
+		def send(body)
+			message = Jabber::Message.new
+			message.set_type(:normal)
+			message.set_id('1')
+			message.set_subject('')
+
+			message.body = body
+
+			exception_recipients.each {|recipient|
+				message.to = recipient
+				@@client.send(message)
+			}
+		end
+
+		def exception_notification(exception, controller, request, data={})
+			return false if sender_account.empty? || exception_recipients.empty?
+			self.connect if !@@client
+			if @@client
+				body = "#{message_prefix}#{controller.controller_name}##{controller.action_name} (#{exception.class}) #{exception.message.inspect} in #{exception.backtrace.first.inspect}\n"
+				send(body)
+			end
+
+		end
 	end
-
-	def exception_notification(exception, controller, request, data={})
-		content_type "text/plain"
-
-		subject    "#{email_prefix}#{controller.controller_name}##{controller.action_name} (#{exception.class}) #{exception.message.inspect}"
-
-		recipients exception_recipients
-		from       sender_address
-
-		body       data.merge({ :controller => controller, :request => request,
-			:exception => exception, :host => (request.env["HTTP_X_FORWARDED_HOST"] || request.env["HTTP_HOST"]),
-			:backtrace => sanitize_backtrace(exception.backtrace),
-			:rails_root => rails_root, :data => data,
-			:sections => sections })
-	end
-
-	private
-
-	def sanitize_backtrace(trace)
-		re = Regexp.new(/^#{Regexp.escape(rails_root)}/)
-		trace.map { |line| Pathname.new(line.gsub(re, "[RAILS_ROOT]")).cleanpath.to_s }
-	end
-
-	def rails_root
-		@rails_root ||= Pathname.new(RAILS_ROOT).cleanpath.to_s
-	end
-
 end

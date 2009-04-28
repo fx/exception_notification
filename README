@@ -1,5 +1,16 @@
 = Exception Notifier Plugin for Rails
 
+This is a fork of Jamis Buck's Exception Notifier that currently simply
+adds Xmpp (Jabber) Support to the table. If you tend to ignore exception
+mails like I do, you'll probably like this.
+
+Simply add something like the following to your environment for Jabber:
+
+XmppNotifier.sender_account = ['exceptions@example.com', 'radpassword']
+XmppNotifier.exception_recipients = ['developer@example.com']
+XmppNotifier.connect
+
+
 The Exception Notifier plugin provides a mailer object and a default set of
 templates for sending email notifications when errors occur in a Rails
 application. The plugin is configurable, allowing programmers to specify:
@@ -108,4 +119,4 @@ own rescue_action_in_public method. You can look at the default implementation
 in ExceptionNotifiable for an example of how to go about that.
 
 
-Copyright (c) 2005 Jamis Buck, released under the MIT license
+Copyright (c) 2005 Jamis Buck, 2009 Marian Rudzynski released under the MIT license
