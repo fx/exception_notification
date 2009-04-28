@@ -1,5 +1,6 @@
 require 'pathname'
 require 'xmpp4r/client'
+require 'xmpp4r/roster'
 
 # Copyright (c) 2009 Marian Rudzynski
 #
@@ -37,6 +38,9 @@ class XmppNotifier
 	@@client = nil
 	cattr_accessor :client
 
+	@@roster = nil
+	cattr_accessor :roster
+
 	class << self
 		def reloadable?() 
 			false
@@ -49,6 +53,13 @@ class XmppNotifier
 				@@client = Jabber::Client.new(jid)
 				@@client.connect
 				@@client.auth(sender_account[1])
+				
+				@@client.send(Jabber::Presence.new.set_type(:available))
+				
+				@@roster = Jabber::Roster::Helper.new(@@client)
+				@@roster.add_subscription_request_callback do |item, pres|
+					@@roster.accept_subscription(pres.from)
+				end
 			end
 		end
 
